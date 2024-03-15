@@ -6,6 +6,7 @@ class SensorCalibrator:
     def __init__(self, linearity):
         # self.calibration_name = calibration_name
         self.linearity = linearity
+        self.sensor_name = ''
         self.calibration_data = {}
 
     def calibrate(self, sensor_data, expected_data):
@@ -27,6 +28,11 @@ class SensorCalibrator:
         plt.xlabel('Sensor Data')
         plt.ylabel('Expected Data')
         plt.legend()
+
+        # Add annotations
+        plt.text(sensor_data[-1], expected_data[-1], f'Slope: {slope:.2f}\nIntercept: {intercept:.2f}',
+                 fontsize=10, verticalalignment='bottom', horizontalalignment='right')
+
         plt.show()
 
         # Store calibration data in the instance dictionary
@@ -34,15 +40,35 @@ class SensorCalibrator:
         self.calibration_data['intercept'] = intercept
 
 
-    @classmethod
-    def load_calibration(cls, calibration_name):
-        filename = f"{calibration_name}_calibration.json"
+    def load_calibration(self, sensor_name):
+        self.sensor_name = sensor_name
+        filename = "Calibrations.json"  # Assuming the JSON file is named Calibrations.json
         with open(filename, 'r') as file:
-            calibration_data = json.load(file)
-        calibrator = cls(calibration_name)
-        calibrator.calibration_data = calibration_data
-        return calibrator
-    
+            all_calibrations = json.load(file)
+        if sensor_name in all_calibrations:
+            self.calibration_data = all_calibrations[sensor_name]
+            print(f"Calibration data loaded for sensor '{sensor_name}': {self.calibration_data}")
+
+        else:
+            print(f"No calibration data found for sensor '{sensor_name}'.")
+
+
+    def save_calibration(self, sensor_name):
+        filename = "Calibrations.json"  # Assuming the JSON file is named Calibrations.json
+        try:
+            with open(filename, 'r') as file:
+                all_calibrations = json.load(file)
+        except FileNotFoundError:
+            all_calibrations = {}
+
+        all_calibrations[sensor_name] = self.calibration_data
+
+        with open(filename, 'w') as file:
+            json.dump(all_calibrations, file, indent=4)
+
+        print(f"Calibration data saved for sensor '{sensor_name}'.")
+
+
     def apply_calibration(self, sensor_data):
         if 'slope' in self.calibration_data and 'intercept' in self.calibration_data:
             calibrated_data = [self.calibration_data['slope'] * x + self.calibration_data['intercept'] for x in sensor_data]
@@ -50,9 +76,3 @@ class SensorCalibrator:
         else:
             print("Calibration data not found. Please calibrate first.")
             return None
-    
-    def save_calibration(self, calibration_name):
-        filename = f"{calibration_name}_calibration.json"
-        with open(filename, 'w') as file:
-            json.dump(self.calibration_data, file)
-        print(f"Calibration data saved to '{filename}'.")
