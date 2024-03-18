@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "cJSON.h"
 
 typedef struct
 {
@@ -13,41 +14,88 @@ typedef struct
     CalibrationData calibration_data;
 } SensorCalibrator;
 
-void calibrate(SensorCalibrator *calibrator, float *sensor_data, float *expected_data, int data_length)
+// Function to save calibration data to a JSON file
+void save_calibration(const char *filename, SensorCalibrator *calibrator)
 {
-    float mean_sensor = 0.0;
-    float mean_expected = 0.0;
-    float numerator = 0.0;
-    float denominator = 0.0;
+    cJSON *root = cJSON_CreateObject();
+    cJSON *sensor = cJSON_CreateObject();
 
-    // Calculate the mean of sensor_data and expected_data
-    for (int i = 0; i < data_length; ++i)
+    cJSON_AddItemToObject(sensor, "slope", cJSON_CreateNumber(calibrator->calibration_data.slope));
+    cJSON_AddItemToObject(sensor, "intercept", cJSON_CreateNumber(calibrator->calibration_data.intercept));
+
+    cJSON_AddItemToObject(root, "Custom_Sensor", sensor);
+
+    char *json_string = cJSON_Print(root);
+    FILE *file = fopen(filename, "w");
+    if (file == NULL)
     {
-        mean_sensor += sensor_data[i];
-        mean_expected += expected_data[i];
+        printf("Error: Failed to open file for writing.\n");
+        cJSON_Delete(root);
+        return;
     }
-    mean_sensor /= data_length;
-    mean_expected /= data_length;
-
-    // Calculate the slope (m) and the intercept (c)
-    for (int i = 0; i < data_length; ++i)
-    {
-        numerator += (sensor_data[i] - mean_sensor) * (expected_data[i] - mean_expected);
-        denominator += (sensor_data[i] - mean_sensor) * (sensor_data[i] - mean_sensor);
-    }
-    calibrator->calibration_data.slope = numerator / denominator;
-    calibrator->calibration_data.intercept = mean_expected - calibrator->calibration_data.slope * mean_sensor;
-
-    // Plot the sensor data and expected data (Not implemented in C)
-    printf("Calibration Completed.\n");
-    printf("Slope: %f\n", calibrator->calibration_data.slope);
-    printf("Intercept: %f\n", calibrator->calibration_data.intercept);
+    fprintf(file, "%s\n", json_string);
+    fclose(file);
+    free(json_string);
+    cJSON_Delete(root);
+    printf("Calibration data saved to '%s'.\n", filename);
 }
 
-void apply_calibration(SensorCalibrator *calibrator, float *sensor_data, float *calibrated_data, int data_length)
+// Function to load calibration data from a JSON file
+void load_calibration(const char *filename, SensorCalibrator *calibrator)
 {
-    for (int i = 0; i < data_length; ++i)
+    FILE *file = fopen(filename, "r");
+    if (file == NULL)
     {
-        calibrated_data[i] = calibrator->calibration_data.slope * sensor_data[i] + calibrator->calibration_data.intercept;
+        printf("Error: Failed to open file for reading.\n");
+        return;
     }
+
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    char *json_string = (char *)malloc(file_size + 1);
+    if (json_string == NULL)
+    {
+        printf("Error: Failed to allocate memory for JSON string.\n");
+        fclose(file);
+        return;
+    }
+
+    fread(json_string, 1, file_size, file);
+    json_string[file_size] = '\0';
+    fclose(file);
+
+    cJSON *root = cJSON_Parse(json_string);
+    free(json_string);
+
+    if (root == NULL)
+    {
+        printf("Error: Failed to parse JSON string.\n");
+        return;
+    }
+
+    cJSON *sensor = cJSON_GetObjectItemCaseSensitive(root, "Custom_Sensor");
+    if (sensor == NULL)
+    {
+        printf("Error: JSON data format is incorrect.\n");
+        cJSON_Delete(root);
+        return;
+    }
+
+    cJSON *slope = cJSON_GetObjectItemCaseSensitive(sensor, "slope");
+    cJSON *intercept = cJSON_GetObjectItemCaseSensitive(sensor, "intercept");
+
+    if (!cJSON_IsNumber(slope) || !cJSON_IsNumber(intercept))
+    {
+        printf("Error: Invalid slope or intercept value.\n");
+        cJSON_Delete(root);
+        return;
+    }
+
+    calibrator->calibration_data.slope = (float)slope->valuedouble;
+    calibrator->calibration_data.intercept = (float)intercept->valuedouble;
+
+    cJSON_Delete(root);
+    printf("Calibration data loaded from '%s'.\n", filename);
 }

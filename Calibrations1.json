@@ -1,0 +1,14 @@
+{
+    "Custom_Sensor3": {
+        "slope": 1.1673189823874754,
+        "intercept": -1.0195694716242656
+    },
+    "Custom_Sensor2": {
+        "slope": 0.1590249373268241,
+        "intercept": 25.556240928882442
+    },
+    "Custom_Sensor": {
+        "slope": 1.185910, 
+        "intercept": -1.577299
+    }
+}
